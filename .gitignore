@@ -1,0 +1,11 @@
+# Go
+/bin/
+/tmp/
+
+# UI
+/web/node_modules/
+/web/dist/
+/web-demo/node_modules/
+
+# Env
+.env
