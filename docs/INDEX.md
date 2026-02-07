@@ -23,3 +23,4 @@
 21. 开发前约定与扩展点: docs/20-development-conventions-and-plan.md
 22. Auth 与审批: docs/21-auth-and-approvals.md
 23. 使用教程: docs/22-usage-guide.md
+24. 无主 Agent 协作框架改造方案: docs/23-leaderless-multiagent-design.md
