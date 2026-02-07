@@ -17,6 +17,7 @@ import (
 	"github.com/execution-hub/execution-hub/internal/application/approval"
 	"github.com/execution-hub/execution-hub/internal/application/audit"
 	"github.com/execution-hub/execution-hub/internal/application/auth"
+	"github.com/execution-hub/execution-hub/internal/application/collab"
 	"github.com/execution-hub/execution-hub/internal/application/executor"
 	"github.com/execution-hub/execution-hub/internal/application/notification"
 	"github.com/execution-hub/execution-hub/internal/application/orchestrator"
@@ -62,6 +63,7 @@ func main() {
 	userRepo := postgres.NewUserRepository(pool)
 	sessionRepo := postgres.NewSessionRepository(pool)
 	approvalRepo := postgres.NewApprovalRepository(pool)
+	collabRepo := postgres.NewCollabRepository(pool)
 
 	// infrastructure
 	sseHub := sse.NewHub()
@@ -93,9 +95,10 @@ func main() {
 
 	taskSvc := task.NewService(taskRepo, stepRepo, workflowRepo, actionSvc, auditSvc, orchestratorSvc, logger)
 	approvalSvc := approval.NewService(approvalRepo, userRepo, taskRepo, stepRepo, workflowRepo, taskSvc, actionSvc, auditSvc, sseHub, logger)
+	collabSvc := collab.NewService(collabRepo, workflowRepo, taskRepo, auditSvc, sseHub, logger)
 
 	// API server
-	apiServer := httpapi.NewServer(workflowSvc, taskSvc, executorSvc, actionSvc, notificationSvc, auditSvc, trustSvc, authSvc, userSvc, approvalSvc, sseHub, cfg.SessionCookieName, cfg.SessionCookieSecure)
+	apiServer := httpapi.NewServer(workflowSvc, taskSvc, executorSvc, actionSvc, notificationSvc, auditSvc, trustSvc, authSvc, userSvc, approvalSvc, collabSvc, sseHub, cfg.SessionCookieName, cfg.SessionCookieSecure)
 
 	httpServer := &http.Server{
 		Addr:         cfg.ServerAddr,
@@ -121,6 +124,7 @@ func main() {
 		defer ticker.Stop()
 		for range ticker.C {
 			_, _ = orchestratorSvc.ProcessTimeouts(context.Background(), 50)
+			_, _ = collabSvc.ProcessExpiredClaims(context.Background(), 50)
 		}
 	}()
 

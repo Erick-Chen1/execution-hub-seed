@@ -16,6 +16,7 @@ import (
 	appApproval "github.com/execution-hub/execution-hub/internal/application/approval"
 	appAudit "github.com/execution-hub/execution-hub/internal/application/audit"
 	appAuth "github.com/execution-hub/execution-hub/internal/application/auth"
+	appCollab "github.com/execution-hub/execution-hub/internal/application/collab"
 	appExecutor "github.com/execution-hub/execution-hub/internal/application/executor"
 	appNotification "github.com/execution-hub/execution-hub/internal/application/notification"
 	appTask "github.com/execution-hub/execution-hub/internal/application/task"
@@ -43,6 +44,7 @@ type Server struct {
 	authSvc             *appAuth.Service
 	userSvc             *appUser.Service
 	approvalSvc         *appApproval.Service
+	collabSvc           *appCollab.Service
 	sseHub              *sse.Hub
 	sessionCookieName   string
 	sessionCookieSecure bool
@@ -59,6 +61,7 @@ func NewServer(
 	authSvc *appAuth.Service,
 	userSvc *appUser.Service,
 	approvalSvc *appApproval.Service,
+	collabSvc *appCollab.Service,
 	sseHub *sse.Hub,
 	sessionCookieName string,
 	sessionCookieSecure bool,
@@ -74,6 +77,7 @@ func NewServer(
 		authSvc:             authSvc,
 		userSvc:             userSvc,
 		approvalSvc:         approvalSvc,
+		collabSvc:           collabSvc,
 		sseHub:              sseHub,
 		sessionCookieName:   sessionCookieName,
 		sessionCookieSecure: sessionCookieSecure,
@@ -181,6 +185,32 @@ func (s *Server) Router() http.Handler {
 			r.Route("/admin", func(r chi.Router) {
 				r.With(s.requireRole(string(domainUser.RoleAdmin))).Get("/audit", s.queryAudit)
 				r.With(s.requireRole(string(domainUser.RoleAdmin))).Get("/audit/{auditId}", s.getAudit)
+			})
+		})
+	})
+
+	r.Route("/v2", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(s.requireAuth)
+			r.Route("/collab", func(r chi.Router) {
+				r.Post("/sessions", s.createCollabSession)
+				r.Get("/sessions/{sessionId}", s.getCollabSession)
+				r.Post("/sessions/{sessionId}/join", s.joinCollabSession)
+				r.Get("/sessions/{sessionId}/steps/open", s.listCollabOpenSteps)
+				r.Get("/sessions/{sessionId}/events", s.listCollabEvents)
+
+				r.Post("/steps/{stepId}/claim", s.claimCollabStep)
+				r.Post("/steps/{stepId}/release", s.releaseCollabStep)
+				r.Post("/steps/{stepId}/handoff", s.handoffCollabStep)
+				r.Post("/steps/{stepId}/artifacts", s.submitCollabArtifact)
+				r.Get("/steps/{stepId}/artifacts", s.listCollabArtifacts)
+				r.Post("/steps/{stepId}/decisions", s.openCollabDecision)
+				r.Post("/steps/{stepId}/resolve", s.resolveCollabStep)
+				r.Get("/steps/{stepId}", s.getCollabStep)
+
+				r.Post("/decisions/{decisionId}/votes", s.voteCollabDecision)
+
+				r.Get("/stream", s.collabSSEEndpoint)
 			})
 		})
 	})
