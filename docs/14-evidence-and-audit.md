@@ -18,6 +18,7 @@ EvidenceBundle 生成
 - 任务创建、启动、取消必须审计
 - Step 分发、ACK、RESOLVE、FAIL 必须审计
 - 高风险操作标记 risk_level
+- 审批请求与审批决策必须审计（含 actor 与 decision）
 
 Trace ID 规则
 - Task 创建时生成 trace_id

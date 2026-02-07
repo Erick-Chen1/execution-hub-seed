@@ -1,0 +1,1895 @@
+openapi: 3.0.3
+info:
+  title: Execution Hub API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+paths:
+  /v1/auth/bootstrap:
+    post:
+      summary: Bootstrap admin user
+      operationId: bootstrapAdmin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: Admin user created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+  /v1/auth/login:
+    post:
+      summary: Login
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: Login success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLoginResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /v1/auth/logout:
+    post:
+      summary: Logout
+      operationId: logout
+      responses:
+        '200':
+          description: Logout success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+  /v1/auth/me:
+    get:
+      summary: Get current user
+      operationId: getMe
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /v1/users:
+    post:
+      summary: Create user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+      responses:
+        '200':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    get:
+      summary: List users
+      operationId: listUsers
+      parameters:
+        - in: query
+          name: role
+          schema:
+            type: string
+        - in: query
+          name: type
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: owner_id
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+  /v1/users/{userId}:
+    get:
+      summary: Get user
+      operationId: getUser
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    patch:
+      summary: Update user
+      operationId: updateUser
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /v1/users/{userId}/password:
+    put:
+      summary: Update user password
+      operationId: updateUserPassword
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordUpdateRequest'
+      responses:
+        '200':
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+
+  /v1/agents:
+    post:
+      summary: Create agent
+      operationId: createAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentCreateRequest'
+      responses:
+        '200':
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    get:
+      summary: List agents
+      operationId: listAgents
+      parameters:
+        - in: query
+          name: owner_id
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Agents list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+  /v1/approvals:
+    get:
+      summary: List approvals
+      operationId: listApprovals
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: entity_type
+          schema:
+            type: string
+        - in: query
+          name: entity_id
+          schema:
+            type: string
+        - in: query
+          name: operation
+          schema:
+            type: string
+        - in: query
+          name: requested_by
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Approvals list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  approvals:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Approval'
+
+  /v1/approvals/{approvalId}:
+    get:
+      summary: Get approval
+      operationId: getApproval
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      responses:
+        '200':
+          description: Approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+  /v1/approvals/{approvalId}/decide:
+    post:
+      summary: Decide approval
+      operationId: decideApproval
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Approval decided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+
+  /v1/workflows:
+    post:
+      summary: Create workflow definition
+      operationId: createWorkflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowCreateRequest'
+      responses:
+        '200':
+          description: Workflow created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowCreateResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+    get:
+      summary: List workflows
+      operationId: listWorkflows
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Workflow list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflows:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkflowDefinition'
+  /v1/workflows/{workflowId}:
+    get:
+      summary: Get workflow definition
+      operationId: getWorkflow
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: Workflow definition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowDefinition'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+  /v1/workflows/{workflowId}/versions:
+    get:
+      summary: List workflow versions
+      operationId: listWorkflowVersions
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: Versions list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkflowDefinition'
+  /v1/workflows/{workflowId}/activate:
+    post:
+      summary: Activate workflow version
+      operationId: activateWorkflow
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  type: integer
+      responses:
+        '200':
+          description: Activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflow_id:
+                    type: string
+                  version:
+                    type: integer
+                  status:
+                    type: string
+  /v1/workflows/{workflowId}/deactivate:
+    post:
+      summary: Deactivate workflow version
+      operationId: deactivateWorkflow
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  type: integer
+      responses:
+        '200':
+          description: Deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflow_id:
+                    type: string
+                  version:
+                    type: integer
+                  status:
+                    type: string
+  /v1/tasks:
+    post:
+      summary: Create task
+      operationId: createTask
+      parameters:
+        - $ref: '#/components/parameters/ActorHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreateRequest'
+      responses:
+        '200':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskCreateResponse'
+    get:
+      summary: List tasks
+      operationId: listTasks
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Task list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+  /v1/tasks/{taskId}:
+    get:
+      summary: Get task
+      operationId: getTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /v1/tasks/{taskId}/start:
+    post:
+      summary: Start task
+      operationId: startTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/ActorHeader'
+      responses:
+        '200':
+          description: Task started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                  status:
+                    type: string
+        '202':
+          description: Approval required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalPendingResponse'
+  /v1/tasks/{taskId}/cancel:
+    post:
+      summary: Cancel task
+      operationId: cancelTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/ActorHeader'
+      responses:
+        '200':
+          description: Task cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                  status:
+                    type: string
+        '202':
+          description: Approval required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalPendingResponse'
+  /v1/tasks/{taskId}/steps:
+    get:
+      summary: List steps for task
+      operationId: listSteps
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Step list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                  steps:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Step'
+  /v1/tasks/{taskId}/steps/{stepId}:
+    get:
+      summary: Get step
+      operationId: getStep
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/StepId'
+      responses:
+        '200':
+          description: Step
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Step'
+  /v1/tasks/{taskId}/steps/{stepId}/dispatch:
+    post:
+      summary: Dispatch step
+      operationId: dispatchStep
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/StepId'
+      responses:
+        '200':
+          description: Step dispatched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  step_id:
+                    type: string
+                  status:
+                    type: string
+  /v1/tasks/{taskId}/steps/{stepId}/ack:
+    post:
+      summary: Acknowledge step
+      operationId: ackStep
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/StepId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepActionRequest'
+      responses:
+        '200':
+          description: Step acked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  step_id:
+                    type: string
+                  status:
+                    type: string
+        '202':
+          description: Approval required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalPendingResponse'
+  /v1/tasks/{taskId}/steps/{stepId}/resolve:
+    post:
+      summary: Resolve step
+      operationId: resolveStep
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/StepId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepActionRequest'
+      responses:
+        '200':
+          description: Step resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  step_id:
+                    type: string
+                  status:
+                    type: string
+        '202':
+          description: Approval required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalPendingResponse'
+  /v1/tasks/{taskId}/steps/{stepId}/fail:
+    post:
+      summary: Fail step
+      operationId: failStep
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/StepId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepActionRequest'
+      responses:
+        '200':
+          description: Step failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  step_id:
+                    type: string
+                  status:
+                    type: string
+  /v1/tasks/{taskId}/evidence:
+    get:
+      summary: Get task evidence
+      operationId: getTaskEvidence
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task evidence
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                  trace_id:
+                    type: string
+                  steps:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StepEvidence'
+  /v1/tasks/{taskId}/steps/{stepId}/evidence:
+    get:
+      summary: Get step evidence
+      operationId: getStepEvidence
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/StepId'
+      responses:
+        '200':
+          description: Step evidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepEvidence'
+  /v1/executors:
+    post:
+      summary: Create executor
+      operationId: createExecutor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutorCreateRequest'
+      responses:
+        '200':
+          description: Executor created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  executor_id:
+                    type: string
+    get:
+      summary: List executors
+      operationId: listExecutors
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Executor list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  executors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Executor'
+  /v1/executors/{executorId}:
+    get:
+      summary: Get executor
+      operationId: getExecutor
+      parameters:
+        - $ref: '#/components/parameters/ExecutorId'
+      responses:
+        '200':
+          description: Executor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Executor'
+  /v1/executors/{executorId}/activate:
+    post:
+      summary: Activate executor
+      operationId: activateExecutor
+      parameters:
+        - $ref: '#/components/parameters/ExecutorId'
+      responses:
+        '200':
+          description: Activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  executor_id:
+                    type: string
+                  status:
+                    type: string
+  /v1/executors/{executorId}/deactivate:
+    post:
+      summary: Deactivate executor
+      operationId: deactivateExecutor
+      parameters:
+        - $ref: '#/components/parameters/ExecutorId'
+      responses:
+        '200':
+          description: Deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  executor_id:
+                    type: string
+                  status:
+                    type: string
+  /v1/actions/{actionId}/ack:
+    post:
+      summary: Acknowledge action
+      operationId: ackAction
+      parameters:
+        - $ref: '#/components/parameters/ActionId'
+        - $ref: '#/components/parameters/ActorHeader'
+      responses:
+        '200':
+          description: Action acked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action_id:
+                    type: string
+                  status:
+                    type: string
+        '202':
+          description: Approval required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalPendingResponse'
+  /v1/actions/{actionId}/resolve:
+    post:
+      summary: Resolve action
+      operationId: resolveAction
+      parameters:
+        - $ref: '#/components/parameters/ActionId'
+        - $ref: '#/components/parameters/ActorHeader'
+      responses:
+        '200':
+          description: Action resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action_id:
+                    type: string
+                  status:
+                    type: string
+        '202':
+          description: Approval required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalPendingResponse'
+  /v1/actions/{actionId}/transitions:
+    get:
+      summary: Get action transitions
+      operationId: getActionTransitions
+      parameters:
+        - $ref: '#/components/parameters/ActionId'
+      responses:
+        '200':
+          description: Action transitions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action_id:
+                    type: string
+                  transitions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActionTransition'
+  /v1/actions/{actionId}/evidence:
+    get:
+      summary: Get action evidence
+      operationId: getActionEvidence
+      parameters:
+        - $ref: '#/components/parameters/ActionId'
+      responses:
+        '200':
+          description: Action evidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionEvidence'
+  /v1/notifications:
+    get:
+      summary: List notifications
+      operationId: listNotifications
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+  /v1/notifications/{notificationId}:
+    get:
+      summary: Get notification
+      operationId: getNotification
+      parameters:
+        - $ref: '#/components/parameters/NotificationId'
+      responses:
+        '200':
+          description: Notification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+  /v1/notifications/{notificationId}/send:
+    post:
+      summary: Send notification
+      operationId: sendNotification
+      parameters:
+        - $ref: '#/components/parameters/NotificationId'
+      responses:
+        '200':
+          description: Notification sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notification_id:
+                    type: string
+                  status:
+                    type: string
+  /v1/notifications/sse:
+    get:
+      summary: SSE stream
+      operationId: sseStream
+      parameters:
+        - in: query
+          name: client_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: user_id
+          schema:
+            type: string
+        - in: query
+          name: groups
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  /v1/trust/events:
+    post:
+      summary: Ingest event and append to hash chain
+      operationId: ingestEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrustEventIngestRequest'
+      responses:
+        '200':
+          description: Event ingested
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id:
+                    type: string
+                  source_id:
+                    type: string
+                  sequence_num:
+                    type: integer
+                  chain_hash:
+                    type: string
+                  trust_level:
+                    type: string
+  /v1/trust/evidence/{bundleType}/{subjectId}:
+    get:
+      summary: Get evidence bundle
+      operationId: getEvidenceBundle
+      parameters:
+        - in: path
+          name: bundleType
+          required: true
+          schema:
+            type: string
+              enum: [EVENT, ACTION, BATCH, TASK]
+        - in: path
+          name: subjectId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evidence bundle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceBundle'
+  /v1/admin/audit:
+    get:
+      summary: Query audit logs
+      operationId: queryAudit
+      parameters:
+        - in: query
+          name: entityType
+          schema:
+            type: string
+        - in: query
+          name: entityId
+          schema:
+            type: string
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: actor
+          schema:
+            type: string
+        - in: query
+          name: riskLevel
+          schema:
+            type: string
+        - in: query
+          name: traceId
+          schema:
+            type: string
+        - in: query
+          name: cursor
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Audit log query result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditQueryResult'
+  /v1/admin/audit/{auditId}:
+    get:
+      summary: Get audit log by ID
+      operationId: getAudit
+      parameters:
+        - $ref: '#/components/parameters/AuditId'
+      responses:
+        '200':
+          description: Audit log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLog'
+  components:
+    securitySchemes:
+      cookieAuth:
+        type: apiKey
+        in: cookie
+        name: exec_hub_session
+      bearerAuth:
+        type: http
+        scheme: bearer
+    parameters:
+    WorkflowId:
+      in: path
+      name: workflowId
+      required: true
+      schema:
+        type: string
+    TaskId:
+      in: path
+      name: taskId
+      required: true
+      schema:
+        type: string
+    StepId:
+      in: path
+      name: stepId
+      required: true
+      schema:
+        type: string
+    ExecutorId:
+      in: path
+      name: executorId
+      required: true
+      schema:
+        type: string
+    ActionId:
+      in: path
+      name: actionId
+      required: true
+      schema:
+        type: string
+    NotificationId:
+      in: path
+      name: notificationId
+      required: true
+      schema:
+        type: string
+    AuditId:
+      in: path
+      name: auditId
+      required: true
+      schema:
+        type: string
+    UserId:
+      in: path
+      name: userId
+      required: true
+      schema:
+        type: string
+    ApprovalId:
+      in: path
+      name: approvalId
+      required: true
+      schema:
+        type: string
+    ActorHeader:
+      in: header
+      name: X-Actor
+      required: false
+      schema:
+        type: string
+    Limit:
+      in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+        default: 100
+        maximum: 200
+    Offset:
+      in: query
+      name: offset
+      required: false
+      schema:
+        type: integer
+        default: 0
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+    AuthLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    AuthLoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        session_id:
+          type: string
+        expires_at:
+          type: string
+        session_token:
+          type: string
+    User:
+      type: object
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, OPERATOR, VIEWER]
+        type:
+          type: string
+          enum: [HUMAN, AGENT]
+        ownerUserId:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, DISABLED]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    UserCreateRequest:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, OPERATOR, VIEWER]
+    UserUpdateRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, OPERATOR, VIEWER]
+        status:
+          type: string
+          enum: [ACTIVE, DISABLED]
+        owner_user_id:
+          type: string
+    AgentCreateRequest:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, OPERATOR, VIEWER]
+        owner_user_id:
+          type: string
+    PasswordUpdateRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+    Approval:
+      type: object
+      properties:
+        approvalId:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+        operation:
+          type: string
+          enum: [TASK_START, TASK_CANCEL, STEP_ACK, STEP_RESOLVE, ACTION_ACK, ACTION_RESOLVE]
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, EXECUTED, FAILED]
+        requestPayload:
+          type: object
+        requestedBy:
+          type: string
+        requestedByType:
+          type: string
+        requiredRoles:
+          type: array
+          items:
+            type: string
+        appliesTo:
+          type: string
+          enum: [HUMAN, AGENT, BOTH]
+        minApprovals:
+          type: integer
+        approvalsCount:
+          type: integer
+        rejectionsCount:
+          type: integer
+        requestedAt:
+          type: string
+        decidedAt:
+          type: string
+        executedAt:
+          type: string
+        executionError:
+          type: string
+    ApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [APPROVE, REJECT]
+        comment:
+          type: string
+    ApprovalPendingResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        approval:
+          $ref: '#/components/schemas/Approval'
+    ApprovalRequirement:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+        applies_to:
+          type: string
+          enum: [HUMAN, AGENT, BOTH]
+        min_approvals:
+          type: integer
+    WorkflowApprovals:
+      type: object
+      properties:
+        task_start:
+          $ref: '#/components/schemas/ApprovalRequirement'
+        task_cancel:
+          $ref: '#/components/schemas/ApprovalRequirement'
+        step_ack:
+          $ref: '#/components/schemas/ApprovalRequirement'
+        step_resolve:
+          $ref: '#/components/schemas/ApprovalRequirement'
+        action_ack:
+          $ref: '#/components/schemas/ApprovalRequirement'
+        action_resolve:
+          $ref: '#/components/schemas/ApprovalRequirement'
+    WorkflowCreateRequest:
+      type: object
+      required: [name, steps]
+      properties:
+        workflow_id:
+          type: string
+        version:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowStep'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowEdge'
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowCondition'
+        approvals:
+          $ref: '#/components/schemas/WorkflowApprovals'
+    WorkflowCreateResponse:
+      type: object
+      properties:
+        workflow_id:
+          type: string
+        version:
+          type: integer
+    WorkflowDefinition:
+      type: object
+      properties:
+        workflowId:
+          type: string
+        name:
+          type: string
+        version:
+          type: integer
+        description:
+          type: string
+        status:
+          type: string
+        definition:
+          type: object
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    WorkflowStep:
+      type: object
+      required: [step_key, name, executor_type, executor_ref, action_type, action_config]
+      properties:
+        step_key:
+          type: string
+        name:
+          type: string
+        executor_type:
+          type: string
+          enum: [HUMAN, AGENT]
+        executor_ref:
+          type: string
+        action_type:
+          type: string
+          enum: [NOTIFY, WEBHOOK, ESCALATE, AGENT_RUN]
+        action_config:
+          type: object
+        timeout_seconds:
+          type: integer
+        max_retries:
+          type: integer
+        depends_on:
+          type: array
+          items:
+            type: string
+        on_fail:
+          type: object
+    WorkflowEdge:
+      type: object
+      required: [from, to]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        condition:
+          type: string
+    WorkflowCondition:
+      type: object
+      properties:
+        name:
+          type: string
+        expression:
+          type: string
+    TaskCreateRequest:
+      type: object
+      required: [title, workflow_id]
+      properties:
+        title:
+          type: string
+        workflow_id:
+          type: string
+        context:
+          type: object
+    TaskCreateResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+        status:
+          type: string
+    Task:
+      type: object
+      properties:
+        taskId:
+          type: string
+        workflowId:
+          type: string
+        workflowVersion:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+        context:
+          type: object
+        traceId:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    Step:
+      type: object
+      properties:
+        stepId:
+          type: string
+        taskId:
+          type: string
+        traceId:
+          type: string
+        stepKey:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        executorType:
+          type: string
+        executorRef:
+          type: string
+        actionType:
+          type: string
+        actionConfig:
+          type: object
+        timeoutSeconds:
+          type: integer
+        retryCount:
+          type: integer
+        maxRetries:
+          type: integer
+        dependsOn:
+          type: array
+          items:
+            type: string
+        actionId:
+          type: string
+        evidence:
+          type: object
+        createdAt:
+          type: string
+        dispatchedAt:
+          type: string
+        ackedAt:
+          type: string
+        resolvedAt:
+          type: string
+        failedAt:
+          type: string
+    StepEvidence:
+      type: object
+      properties:
+        step:
+          $ref: '#/components/schemas/Step'
+        action_evidence:
+          $ref: '#/components/schemas/ActionEvidence'
+        transitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActionTransition'
+    StepActionRequest:
+      type: object
+      properties:
+        actor:
+          type: string
+        comment:
+          type: string
+        evidence:
+          type: object
+        reason:
+          type: string
+    ExecutorCreateRequest:
+      type: object
+      required: [executor_id, executor_type, display_name]
+      properties:
+        executor_id:
+          type: string
+        executor_type:
+          type: string
+          enum: [HUMAN, AGENT]
+        display_name:
+          type: string
+        capability_tags:
+          type: array
+          items:
+            type: string
+    Executor:
+      type: object
+      properties:
+        executorId:
+          type: string
+        executorType:
+          type: string
+        displayName:
+          type: string
+        capabilityTags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        metadata:
+          type: object
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    ActionTransition:
+      type: object
+      properties:
+        actionId:
+          type: string
+        fromStatus:
+          type: string
+        toStatus:
+          type: string
+        transitionedAt:
+          type: string
+        reason:
+          type: string
+    ActionEvidence:
+      type: object
+      properties:
+        Action:
+          $ref: '#/components/schemas/Action'
+        Evaluation:
+          type: object
+        Rule:
+          type: object
+    Action:
+      type: object
+      properties:
+        actionId:
+          type: string
+        actionType:
+          type: string
+        actionConfig:
+          type: object
+        status:
+          type: string
+        priority:
+          type: string
+        retryCount:
+          type: integer
+        maxRetries:
+          type: integer
+        createdAt:
+          type: string
+    Notification:
+      type: object
+      properties:
+        notificationId:
+          type: string
+        actionId:
+          type: string
+        dedupeKey:
+          type: string
+        channel:
+          type: string
+        priority:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        payload:
+          type: object
+        status:
+          type: string
+        targetUserId:
+          type: string
+        targetGroup:
+          type: string
+        retryCount:
+          type: integer
+        maxRetries:
+          type: integer
+        lastError:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+        sentAt:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: string
+          format: date-time
+        failedAt:
+          type: string
+          format: date-time
+        traceId:
+          type: string
+    TrustEventIngestRequest:
+      type: object
+      required: [source_type, source_id, event_type, payload, schema_version]
+      properties:
+        event_id:
+          type: string
+        client_record_id:
+          type: string
+        source_type:
+          type: string
+        source_id:
+          type: string
+        ts_device:
+          type: string
+          format: date-time
+        ts_gateway:
+          type: string
+          format: date-time
+        key:
+          type: string
+        event_type:
+          type: string
+        payload:
+          type: object
+        schema_version:
+          type: string
+    EvidenceBundle:
+      type: object
+      properties:
+        bundleId:
+          type: string
+        bundleType:
+          type: string
+          enum: [EVENT, ACTION, BATCH, TASK]
+        subjectId:
+          type: string
+        generatedAt:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventEvidence'
+        hashChain:
+          type: array
+          items:
+            $ref: '#/components/schemas/HashChainEntry'
+        signatures:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchSignature'
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleEvidence'
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActionEvidenceEntry'
+        verification:
+          $ref: '#/components/schemas/VerificationSummary'
+        bundleHash:
+          type: string
+    EventEvidence:
+      type: object
+      properties:
+        eventId:
+          type: string
+        clientRecordId:
+          type: string
+        sourceType:
+          type: string
+        sourceId:
+          type: string
+        tsDevice:
+          type: string
+        tsGateway:
+          type: string
+        tsServer:
+          type: string
+        key:
+          type: string
+        eventType:
+          type: string
+        payload:
+          type: object
+        schemaVersion:
+          type: string
+        trustLevel:
+          type: integer
+    HashChainEntry:
+      type: object
+      properties:
+        eventId:
+          type: string
+        sourceId:
+          type: string
+        sequenceNum:
+          type: integer
+        eventHash:
+          type: string
+        prevHash:
+          type: string
+        chainHash:
+          type: string
+        trustLevel:
+          type: integer
+        createdAt:
+          type: string
+    BatchSignature:
+      type: object
+      properties:
+        batchId:
+          type: string
+        sourceId:
+          type: string
+        eventIds:
+          type: array
+          items:
+            type: string
+        batchHash:
+          type: string
+        signature:
+          type: string
+        signatureAlg:
+          type: string
+        keyId:
+          type: string
+        signedAt:
+          type: string
+        verificationStatus:
+          type: string
+    ActionEvidenceEntry:
+      type: object
+      properties:
+        actionId:
+          type: string
+        ruleId:
+          type: string
+        ruleVersion:
+          type: integer
+        evaluationId:
+          type: string
+        actionType:
+          type: string
+        actionConfig:
+          type: object
+        status:
+          type: string
+        createdAt:
+          type: string
+        evidence:
+          type: object
+    RuleEvidence:
+      type: object
+      properties:
+        ruleId:
+          type: string
+        version:
+          type: integer
+        name:
+          type: string
+        ruleType:
+          type: string
+        config:
+          type: object
+        effectiveFrom:
+          type: string
+          format: date-time
+        effectiveUntil:
+          type: string
+          format: date-time
+    VerificationSummary:
+      type: object
+      properties:
+        overallTrustLevel:
+          type: integer
+        hashChainValid:
+          type: boolean
+        signatureValid:
+          type: boolean
+        chainBreaks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChainBreak'
+        verificationErrors:
+          type: array
+          items:
+            type: string
+    ChainBreak:
+      type: object
+      properties:
+        sourceId:
+          type: string
+        breakAt:
+          type: integer
+        expectedHash:
+          type: string
+        actualHash:
+          type: string
+        detectedAt:
+          type: string
+    AuditLog:
+      type: object
+      properties:
+        auditId:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+        action:
+          type: string
+        actor:
+          type: string
+        riskLevel:
+          type: string
+        traceId:
+          type: string
+        createdAt:
+          type: string
+    AuditQueryResult:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLog'
+        pagination:
+          type: object
+          properties:
+            cursor:
+              type: string
+            hasMore:
+              type: boolean
+            count:
+              type: integer
+            total:
+              type: integer

@@ -20,3 +20,5 @@
 18. 交接清单: docs/17-handoff-checklist.md
 19. 术语表: docs/18-glossary.md
 20. 风险登记: docs/19-risk-register.md
+21. 开发前约定与扩展点: docs/20-development-conventions-and-plan.md
+22. Auth 与审批: docs/21-auth-and-approvals.md

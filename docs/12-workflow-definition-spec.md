@@ -9,6 +9,7 @@
 - steps: 步骤定义列表
 - edges: 依赖关系
 - conditions: 可选条件表达式
+- approvals: 审批策略（可选）
 
 示例
 {
@@ -39,7 +40,11 @@
   ],
   "edges": [
     {"from": "draft", "to": "review"}
-  ]
+  ],
+  "approvals": {
+    "task_start": { "enabled": true, "roles": ["ADMIN"], "applies_to": "BOTH", "min_approvals": 1 },
+    "step_resolve": { "enabled": true, "roles": ["OPERATOR"], "applies_to": "HUMAN", "min_approvals": 1 }
+  }
 }
 
 条件与分支
