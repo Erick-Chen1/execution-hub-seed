@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "web-demo/**"
+      - "web/**"
       - ".github/workflows/pages.yml"
 
 permissions:
@@ -27,19 +27,19 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-          cache-dependency-path: web-demo/package-lock.json
+          cache-dependency-path: web/package-lock.json
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Install Dependencies
         run: npm ci
-        working-directory: web-demo
+        working-directory: web
       - name: Build
         run: npm run build
-        working-directory: web-demo
+        working-directory: web
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: web-demo/dist
+          path: web/dist
 
   deploy:
     needs: build
