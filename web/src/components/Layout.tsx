@@ -18,7 +18,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           queryClient.invalidateQueries({ queryKey: ['approvals'] });
         }
         if (payload.event === 'notification') {
-          queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        }
+        if (payload.event === 'collab') {
+          queryClient.invalidateQueries({ queryKey: ['collab'] });
         }
       } catch {
         // ignore
@@ -30,17 +33,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">Execution Hub</div>
+        <div className="brand">Execution Hub V2</div>
         <nav>
-          <NavLink to="/" end>
-            Dashboard
-          </NavLink>
+          <NavLink to="/collab">Collab</NavLink>
           <NavLink to="/workflows">Workflows</NavLink>
-          <NavLink to="/tasks">Tasks</NavLink>
           <NavLink to="/executors">Executors</NavLink>
-          <NavLink to="/actions">Actions</NavLink>
           <NavLink to="/notifications">Notifications</NavLink>
-          <NavLink to="/approvals">Approvals</NavLink>
           <NavLink to="/trust">Trust</NavLink>
           {user?.role === 'ADMIN' && <NavLink to="/audit">Audit</NavLink>}
           {user?.role === 'ADMIN' && <NavLink to="/users">Users</NavLink>}
@@ -53,7 +51,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
       <main className="main">
         <div className="topbar">
-          <div className="title">{user?.username}'s Console</div>
+          <div className="title">{user?.username}'s V2 Console</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <div className="mono">Session active</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

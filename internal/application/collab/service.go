@@ -887,6 +887,30 @@ func (s *Service) GetParticipantByRef(ctx context.Context, sessionID uuid.UUID, 
 	return s.repo.GetParticipantByRef(ctx, sessionID, ref)
 }
 
+// ListParticipants lists session participants with pagination.
+func (s *Service) ListParticipants(ctx context.Context, sessionID uuid.UUID, limit, offset int) ([]*collab.Participant, error) {
+	if sessionID == uuid.Nil {
+		return nil, fmt.Errorf("session_id is required")
+	}
+	session, err := s.repo.GetSessionByID(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if session == nil {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return s.repo.ListParticipants(ctx, sessionID, limit, offset)
+}
+
 // ListEvents lists session timeline events.
 func (s *Service) ListEvents(ctx context.Context, sessionID uuid.UUID, limit, offset int) ([]*collab.Event, error) {
 	if sessionID == uuid.Nil {

@@ -180,6 +180,7 @@ func (s *Server) Router() http.Handler {
 				r.Post("/sessions", s.createCollabSession)
 				r.Get("/sessions/{sessionId}", s.getCollabSession)
 				r.Post("/sessions/{sessionId}/join", s.joinCollabSession)
+				r.Get("/sessions/{sessionId}/participants", s.listCollabParticipants)
 				r.Get("/sessions/{sessionId}/steps/open", s.listCollabOpenSteps)
 				r.Get("/sessions/{sessionId}/events", s.listCollabEvents)
 

@@ -145,6 +145,28 @@ type apiError struct {
 
 func (e *apiError) Error() string { return e.message }
 
+func (s *Server) listCollabParticipants(w http.ResponseWriter, r *http.Request) {
+	sessionID, err := parseUUIDParam(r, "sessionId")
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "INVALID_PARAM", "invalid sessionId")
+		return
+	}
+	if err := s.ensureSessionAccess(r, sessionID); err != nil {
+		respondError(w, http.StatusForbidden, "FORBIDDEN", err.Error())
+		return
+	}
+	limit, offset := parseLimitOffset(r, 100, 500)
+	participants, err := s.collabSvc.ListParticipants(contextFromRequest(r), sessionID, limit, offset)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "INVALID_PARAM", err.Error())
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"session_id":   sessionID,
+		"participants": participants,
+	})
+}
+
 func (s *Server) listCollabOpenSteps(w http.ResponseWriter, r *http.Request) {
 	sessionID, err := parseUUIDParam(r, "sessionId")
 	if err != nil {

@@ -213,3 +213,140 @@ export interface AuditQueryResult {
     total?: number;
   };
 }
+
+export interface CollabSession {
+  id: number;
+  sessionId: string;
+  taskId: string;
+  workflowId: string;
+  workflowVersion: number;
+  name: string;
+  status: 'ACTIVE' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | string;
+  context?: Record<string, unknown>;
+  traceId: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CollabParticipant {
+  id: number;
+  participantId: string;
+  sessionId: string;
+  type: 'HUMAN' | 'AGENT' | string;
+  ref: string;
+  capabilities?: string[];
+  trustScore: number;
+  joinedAt?: string;
+  lastSeenAt?: string;
+}
+
+export interface CollabStep {
+  id: number;
+  stepId: string;
+  sessionId: string;
+  stepKey: string;
+  name: string;
+  status: 'OPEN' | 'CLAIMED' | 'IN_REVIEW' | 'RESOLVED' | 'FAILED' | string;
+  requiredCapabilities?: string[];
+  dependsOn?: string[];
+  leaseTtlSeconds: number;
+  consensusPolicy?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+  resolvedAt?: string;
+}
+
+export interface CollabClaim {
+  id: number;
+  claimId: string;
+  stepId: string;
+  participantId: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'RELEASED' | string;
+  leaseUntil: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CollabArtifact {
+  id: number;
+  artifactId: string;
+  stepId: string;
+  producerId: string;
+  kind: string;
+  content: Record<string, unknown>;
+  version: number;
+  createdAt?: string;
+}
+
+export interface CollabDecision {
+  id: number;
+  decisionId: string;
+  stepId: string;
+  policy: Record<string, unknown>;
+  deadline?: string;
+  status: 'PENDING' | 'PASSED' | 'REJECTED' | string;
+  result?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  decidedAt?: string;
+}
+
+export interface CollabVote {
+  id: number;
+  voteId: string;
+  decisionId: string;
+  participantId: string;
+  choice: 'APPROVE' | 'REJECT' | string;
+  comment?: string;
+  createdAt?: string;
+}
+
+export interface CollabEvent {
+  id: number;
+  eventId: string;
+  sessionId: string;
+  stepId?: string;
+  type: string;
+  actor: string;
+  payload?: Record<string, unknown>;
+  createdAt?: string;
+}
+
+export interface CollabOpenStepsResponse {
+  session_id?: string;
+  sessionId?: string;
+  steps: CollabStep[];
+}
+
+export interface CollabParticipantsResponse {
+  session_id?: string;
+  sessionId?: string;
+  participants: CollabParticipant[];
+}
+
+export interface CollabArtifactsResponse {
+  step_id?: string;
+  stepId?: string;
+  artifacts: CollabArtifact[];
+}
+
+export interface CollabEventsResponse {
+  session_id?: string;
+  sessionId?: string;
+  events: CollabEvent[];
+}
+
+export interface CollabSSEMessage {
+  id?: string;
+  event?: string;
+  data?: {
+    eventId?: string;
+    sessionId?: string;
+    stepId?: string;
+    type?: string;
+    actor?: string;
+    payload?: Record<string, unknown>;
+    createdAt?: string;
+  };
+  timestamp?: string;
+}

@@ -6,6 +6,22 @@
 - Keep only the capabilities that matter: workflow, approval, audit, evidence, realtime notifications.
 - Make first-run usage simple: join session, claim step, submit artifact.
 
+## 1.1 Implementation Status (2026-02-07)
+Completed:
+- Centralized collaboration runtime API is online under `/v2/collab/*`.
+- P2P runtime MVP is implemented:
+  - `cmd/p2pnode/main.go`
+  - `internal/p2p/protocol`
+  - `internal/p2p/state`
+  - `internal/p2p/consensus` (Raft)
+  - `internal/p2p/api`
+- End-to-end state transitions are covered in unit tests for protocol/state.
+
+Pending:
+- P2P authn/authz hardening and key lifecycle.
+- Network-plane enhancements (discovery, NAT traversal, gossip fanout).
+- Full OpenAPI contract for `/v1/p2p/*`.
+
 ## 2. Non-Goals
 - Do not preserve old step APIs or old action semantics.
 - Do not keep the `AgentRunner` execution path.

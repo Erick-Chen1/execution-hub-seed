@@ -41,6 +41,24 @@ podman compose -f compose.yaml up -d
 go run ./cmd/server
 ```
 
+启动 P2P 协作节点（Raft + 状态机）:
+```
+set P2P_NODE_ID=node-1
+set P2P_RAFT_ADDR=127.0.0.1:17000
+set P2P_HTTP_ADDR=127.0.0.1:18080
+set P2P_BOOTSTRAP=true
+go run ./cmd/p2pnode
+```
+
+第二个节点加入同一集群:
+```
+set P2P_NODE_ID=node-2
+set P2P_RAFT_ADDR=127.0.0.1:17001
+set P2P_HTTP_ADDR=127.0.0.1:18081
+set P2P_JOIN_ENDPOINT=http://127.0.0.1:18080
+go run ./cmd/p2pnode
+```
+
 启动前端:
 ```
 cd web

@@ -24,3 +24,4 @@
 22. Auth 与审批: docs/21-auth-and-approvals.md
 23. 使用教程: docs/22-usage-guide.md
 24. 无主 Agent 协作框架改造方案: docs/23-leaderless-multiagent-design.md
+25. P2P Runtime 指南: docs/24-p2p-runtime-guide.md

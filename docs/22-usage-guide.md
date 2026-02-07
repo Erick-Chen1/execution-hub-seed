@@ -1,163 +1,129 @@
 # 使用教程
 
-本教程覆盖本地运行、登录、创建工作流、创建任务、推进步骤、审批与审计的最小闭环。更完整的字段说明与约束请参考 `docs/openapi.yaml` 与 `docs/12-workflow-definition-spec.md`。
+本文给出两条可落地路径：
+- 路径 A：使用中心化后端（`cmd/server` + `/v2/collab/*`）
+- 路径 B：使用低延迟 P2P Runtime（`cmd/p2pnode` + `/v1/p2p/*`）
 
-**快速开始（Win11 一键）**
-前置依赖:
+## 1. 环境准备
 - Go 1.24+
-- Podman（支持 `podman compose`）
 - Node 18+
+- Podman（用于本地 Postgres）
 
-运行:
-```cmd
-start-win11.cmd
-```
+## 2. 路径 A：中心化协作 API
 
-脚本会启动 Postgres、API、Web UI，并打开 `http://localhost:5173`。API 默认 `http://127.0.0.1:8080`。
-
-停止:
-```cmd
-stop-win11.cmd
-```
-
-**手动启动（便于调试）**
-启动 Postgres:
-```cmd
+### 2.1 启动
+```powershell
 podman compose -f compose.yaml up -d
-```
-
-启动 API:
-```cmd
 go run ./cmd/server
 ```
 
-启动 Web:
-```cmd
-cd web
-npm install
-npm run dev
-```
-
-**初始化管理员与登录（PowerShell 示例）**
-密码规则:
-- >= 12 字符
-- 必须包含大小写字母、数字、特殊字符
-- 不得包含用户名
-
+### 2.2 初始化管理员并登录
 ```powershell
 $base = "http://127.0.0.1:8080/v1"
 $cred = @{ username = "admin"; password = "Strong!Passw0rd" }
 
-# 首次初始化管理员（只允许一次）
 Invoke-RestMethod -Method Post -Uri "$base/auth/bootstrap" `
-  -Body ($cred | ConvertTo-Json) -ContentType "application/json"
+  -Body ($cred | ConvertTo-Json) -ContentType "application/json" | Out-Null
 
-# 登录并保存会话 Cookie
 Invoke-RestMethod -Method Post -Uri "$base/auth/login" `
   -Body ($cred | ConvertTo-Json) -ContentType "application/json" `
   -SessionVariable session | Out-Null
 ```
 
-后续请求使用 `-WebSession $session` 复用 Cookie。也支持 `Authorization: Bearer <session_token>` 用于脚本调用。
-
-**创建用户与 Agent（可选）**
+### 2.3 创建协作会话
 ```powershell
-# 创建普通用户
-$userReq = @{ username = "alice"; password = "S3cure!Passw0rd"; role = "OPERATOR" }
-$user = Invoke-RestMethod -Method Post -Uri "$base/users" `
-  -Body ($userReq | ConvertTo-Json) -ContentType "application/json" -WebSession $session
-
-# 创建 Agent（绑定 owner_user_id）
-$agentReq = @{ username = "writer"; password = "S3cure!Passw0rd"; role = "OPERATOR"; owner_user_id = $user.userId }
-Invoke-RestMethod -Method Post -Uri "$base/agents" `
-  -Body ($agentReq | ConvertTo-Json) -ContentType "application/json" -WebSession $session
-```
-
-需要以 Agent 身份执行时，在请求头加入 `X-Actor: agent:<username>`。非管理员仅允许使用自己名下 Agent。
-
-**创建 Workflow**
-```powershell
-$wfReq = @{
-  name = "report_pipeline"
-  description = "report demo"
-  steps = @(
-    @{
-      step_key = "draft"
-      name = "AI 草拟"
-      executor_type = "AGENT"
-      executor_ref = "agent:writer"
-      action_type = "AGENT_RUN"
-      action_config = @{ prompt = "写一版大纲" }
-      timeout_seconds = 900
-      max_retries = 2
-    },
-    @{
-      step_key = "review"
-      name = "人工复核"
-      executor_type = "HUMAN"
-      executor_ref = "user:alice"
-      action_type = "NOTIFY"
-      action_config = @{ title = "请复核"; body = "review draft"; channel = "SSE"; userId = "alice" }
-      depends_on = @("draft")
-    }
-  )
-  approvals = @{
-    step_resolve = @{ enabled = $true; roles = @("OPERATOR"); applies_to = "HUMAN"; min_approvals = 1 }
-  }
+$create = @{
+  workflow_id = "<workflow-uuid>"
+  title = "demo-collab"
+  context = @{ topic = "compiler" }
 }
+$sessionResp = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/v2/collab/sessions" `
+  -Body ($create | ConvertTo-Json -Depth 8) -ContentType "application/json" -WebSession $session
 
-$wf = Invoke-RestMethod -Method Post -Uri "$base/workflows" `
-  -Body ($wfReq | ConvertTo-Json -Depth 8) -ContentType "application/json" -WebSession $session
+$sessionId = $sessionResp.sessionId
 ```
 
-复杂依赖可用 `edges` + `conditions`，示例见 `docs/12-workflow-definition-spec.md`。
-
-**创建 Task 并启动**
+### 2.4 加入会话并查询开放步骤
 ```powershell
-$taskReq = @{ title = "报告任务"; workflow_id = $wf.workflow_id; context = @{ topic = "NFC" } }
-$task = Invoke-RestMethod -Method Post -Uri "$base/tasks" `
-  -Body ($taskReq | ConvertTo-Json -Depth 8) -ContentType "application/json" -WebSession $session
+$join = @{ type = "HUMAN"; ref = "user:admin"; capabilities = @("draft","review") }
+$participant = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/v2/collab/sessions/$sessionId/join" `
+  -Body ($join | ConvertTo-Json -Depth 6) -ContentType "application/json" -WebSession $session
 
-Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/start" -WebSession $session | Out-Null
+$pid = $participant.participantId
+
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8080/v2/collab/sessions/$sessionId/steps/open?participant_id=$pid" -WebSession $session
 ```
 
-**推进 Step（ACK / Resolve / Fail）**
+### 2.5 认领步骤并提交产物
 ```powershell
-$stepsResp = Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)/steps" -WebSession $session
-$step = $stepsResp.steps | Where-Object { $_.stepKey -eq "review" } | Select-Object -First 1
+$stepId = "<open-step-id>"
 
-Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/steps/$($step.stepId)/resolve" `
-  -Body (@{ comment = "已复核"; evidence = @{ ok = $true } } | ConvertTo-Json -Depth 6) `
-  -ContentType "application/json" -WebSession $session | Out-Null
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/v2/collab/steps/$stepId/claim" `
+  -Body (@{ participant_id = $pid; lease_seconds = 600 } | ConvertTo-Json) `
+  -ContentType "application/json" -WebSession $session
+
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/v2/collab/steps/$stepId/artifacts" `
+  -Body (@{ participant_id = $pid; kind = "draft"; content = @{ text = "hello" } } | ConvertTo-Json -Depth 8) `
+  -ContentType "application/json" -WebSession $session
 ```
 
-如果触发审批，接口会返回 `202` 与 `approval` 信息。
-
-**审批处理**
+### 2.6 发起决策、投票、解决步骤
 ```powershell
-$approvalId = "<approval-id>"
-Invoke-RestMethod -Method Post -Uri "$base/approvals/$approvalId/decide" `
-  -Body (@{ decision = "APPROVE"; comment = "同意" } | ConvertTo-Json) `
-  -ContentType "application/json" -WebSession $session | Out-Null
+$decision = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/v2/collab/steps/$stepId/decisions" `
+  -Body (@{} | ConvertTo-Json) -ContentType "application/json" -WebSession $session
+
+$decisionId = $decision.decisionId
+
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/v2/collab/decisions/$decisionId/votes" `
+  -Body (@{ participant_id = $pid; choice = "APPROVE" } | ConvertTo-Json) `
+  -ContentType "application/json" -WebSession $session
+
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/v2/collab/steps/$stepId/resolve" `
+  -Body (@{ participant_id = $pid } | ConvertTo-Json) `
+  -ContentType "application/json" -WebSession $session
 ```
 
-审批事件会通过 SSE 推送（`GET /v1/notifications/sse`），也可以轮询 `GET /v1/approvals`。
+## 3. 路径 B：P2P Runtime
 
-**Evidence / Trust / Audit**
+详细说明见 `docs/24-p2p-runtime-guide.md`，这里给最短流程。
+
+### 3.1 启动节点 1（引导）
 ```powershell
-# Task Evidence
-Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)/evidence" -WebSession $session
-
-# Trust 事件与证据包
-$eventReq = @{ source_type = "sensor"; source_id = "sensor-1"; event_type = "temp"; schema_version = "1"; payload = @{ value = 42 } }
-$eventResp = Invoke-RestMethod -Method Post -Uri "$base/trust/events" `
-  -Body ($eventReq | ConvertTo-Json -Depth 6) -ContentType "application/json" -WebSession $session
-Invoke-RestMethod -Method Get -Uri "$base/trust/evidence/EVENT/$($eventResp.event_id)" -WebSession $session
-Invoke-RestMethod -Method Get -Uri "$base/trust/evidence/TASK/$($task.task_id)" -WebSession $session
-
-# Audit（管理员）
-Invoke-RestMethod -Method Get -Uri "$base/admin/audit?limit=20" -WebSession $session
+$env:P2P_NODE_ID = "node-1"
+$env:P2P_RAFT_ADDR = "127.0.0.1:17000"
+$env:P2P_HTTP_ADDR = "127.0.0.1:18080"
+$env:P2P_BOOTSTRAP = "true"
+go run ./cmd/p2pnode
 ```
 
-**Web 前端使用**
-启动后访问 `http://localhost:5173`，页面覆盖 Dashboard / Workflows / Tasks / Executors / Actions / Notifications / Approvals / Trust / Audit / Users。若端口占用，以终端输出为准。
+### 3.2 启动节点 2（加入）
+```powershell
+$env:P2P_NODE_ID = "node-2"
+$env:P2P_RAFT_ADDR = "127.0.0.1:17001"
+$env:P2P_HTTP_ADDR = "127.0.0.1:18081"
+$env:P2P_JOIN_ENDPOINT = "http://127.0.0.1:18080"
+go run ./cmd/p2pnode
+```
+
+### 3.3 检查集群
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:18080/healthz"
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:18080/v1/p2p/raft"
+```
+
+### 3.4 提交事务
+P2P 写入统一走 `POST /v1/p2p/tx`，请求体是已签名 `protocol.Tx`。字段和签名规则参考：
+- `internal/p2p/protocol/types.go`
+- `internal/p2p/protocol/types_test.go`
+
+### 3.5 查询状态
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:18080/v1/p2p/stats"
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:18080/v1/p2p/sessions/<session-id>"
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:18080/v1/p2p/sessions/<session-id>/events"
+```
+
+## 4. 常见问题
+- 收到 `NOT_LEADER`：写请求打到了 follower，请改投 leader 地址。
+- 看到步骤不可认领：通常是依赖未完成、能力不匹配或已有有效租约。
+- 会话不自动完成：需确保会话内所有步骤都进入 `RESOLVED`。
