@@ -21,6 +21,16 @@ OpenAPI 规范:
 - Podman（支持 `podman compose`）
 - Node 18+
 
+Win 11 一键启动:
+```
+start-win11.cmd
+```
+
+Win 11 一键停止:
+```
+stop-win11.cmd
+```
+
 启动 Postgres:
 ```
 podman compose -f compose.yaml up -d
