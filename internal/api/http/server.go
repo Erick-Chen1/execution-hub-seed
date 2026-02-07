@@ -116,21 +116,8 @@ func (s *Server) Router() http.Handler {
 			})
 
 			r.Route("/tasks", func(r chi.Router) {
-				r.Post("/", s.createTask)
-				r.Get("/", s.listTasks)
-				r.Get("/{taskId}", s.getTask)
-				r.Post("/{taskId}/start", s.startTask)
-				r.Post("/{taskId}/cancel", s.cancelTask)
-
-				r.Get("/{taskId}/steps", s.listSteps)
-				r.Get("/{taskId}/steps/{stepId}", s.getStep)
-				r.Post("/{taskId}/steps/{stepId}/dispatch", s.dispatchStep)
-				r.Post("/{taskId}/steps/{stepId}/ack", s.ackStep)
-				r.Post("/{taskId}/steps/{stepId}/resolve", s.resolveStep)
-				r.Post("/{taskId}/steps/{stepId}/fail", s.failStep)
-
-				r.Get("/{taskId}/evidence", s.getTaskEvidence)
-				r.Get("/{taskId}/steps/{stepId}/evidence", s.getStepEvidence)
+				r.HandleFunc("/", s.legacyTaskStepChainGone)
+				r.HandleFunc("/*", s.legacyTaskStepChainGone)
 			})
 
 			r.Route("/executors", func(r chi.Router) {
@@ -142,10 +129,8 @@ func (s *Server) Router() http.Handler {
 			})
 
 			r.Route("/actions", func(r chi.Router) {
-				r.Post("/{actionId}/ack", s.ackAction)
-				r.Post("/{actionId}/resolve", s.resolveAction)
-				r.Get("/{actionId}/transitions", s.getActionTransitions)
-				r.Get("/{actionId}/evidence", s.getActionEvidence)
+				r.HandleFunc("/", s.legacyTaskStepChainGone)
+				r.HandleFunc("/*", s.legacyTaskStepChainGone)
 			})
 
 			r.Route("/notifications", func(r chi.Router) {
@@ -156,9 +141,8 @@ func (s *Server) Router() http.Handler {
 			})
 
 			r.Route("/approvals", func(r chi.Router) {
-				r.Get("/", s.listApprovals)
-				r.Get("/{approvalId}", s.getApproval)
-				r.Post("/{approvalId}/decide", s.decideApproval)
+				r.HandleFunc("/", s.legacyTaskStepChainGone)
+				r.HandleFunc("/*", s.legacyTaskStepChainGone)
 			})
 
 			r.Route("/users", func(r chi.Router) {
@@ -296,6 +280,13 @@ func parseLimitOffset(r *http.Request, defaultLimit, maxLimit int) (int, int) {
 		offset = 0
 	}
 	return limit, offset
+}
+
+func (s *Server) legacyTaskStepChainGone(w http.ResponseWriter, r *http.Request) {
+	respondJSON(w, http.StatusGone, map[string]interface{}{
+		"error":   "ENDPOINT_REMOVED",
+		"message": "Legacy /v1 task-step execution chain has been removed. Use /v2/collab/* endpoints.",
+	})
 }
 
 // Data types for requests
