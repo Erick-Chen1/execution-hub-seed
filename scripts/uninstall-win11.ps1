@@ -1,3 +1,8 @@
+param(
+  [switch]$KeepData,
+  [switch]$KeepEnvFile
+)
+
 $ErrorActionPreference = "Stop"
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -10,20 +15,17 @@ function Stop-TrackedProcess {
     [string]$Label
   )
 
-  if ($ProcessId -le 0) { return $false }
+  if ($ProcessId -le 0) { return }
   try {
     $p = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-    if (-not $p) { return $false }
+    if (-not $p) { return }
     Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
     if ($Label) {
       Write-Host "Stopped $Label process (PID $ProcessId)"
     } else {
-      Write-Host "Stopped tracked process (PID $ProcessId)"
+      Write-Host "Stopped process PID $ProcessId"
     }
-    return $true
-  } catch {
-    return $false
-  }
+  } catch {}
 }
 
 function Stop-PortProcess {
@@ -41,25 +43,48 @@ function Stop-PortProcess {
     try {
       Stop-Process -Id $procId -Force
       Write-Host "Stopped process on port $Port (PID $procId)"
-    } catch {
-      Write-Host "Failed to stop PID $procId on port $Port"
-    }
+    } catch {}
   }
 }
 
+Write-Host "Stopping local processes..."
 if (Test-Path $runtimeStateFile) {
   try {
     $state = Get-Content $runtimeStateFile -Raw | ConvertFrom-Json
-    [void](Stop-TrackedProcess -ProcessId ([int]$state.nodePid) -Label "P2P node")
-  } catch {
-    Write-Host "Failed to read runtime state file: $runtimeStateFile"
-  }
-  Remove-Item $runtimeStateFile -Force -ErrorAction SilentlyContinue
+    Stop-TrackedProcess -ProcessId ([int]$state.nodePid) -Label "P2P node"
+  } catch {}
 }
-
 Stop-PortProcess 18080
 Stop-PortProcess 18081
 Stop-PortProcess 17000
 Stop-PortProcess 17001
 
-Write-Host "Done."
+Write-Host "Cleaning local generated files..."
+$pathsToRemove = @(
+  (Join-Path $root "tmp\runtime")
+)
+if (-not $KeepData) {
+  $pathsToRemove += (Join-Path $root "tmp\p2pnode")
+}
+foreach ($path in $pathsToRemove) {
+  if (Test-Path $path) {
+    Remove-Item -Recurse -Force $path
+    Write-Host "Removed $path"
+  }
+}
+
+if (-not $KeepEnvFile) {
+  $envFile = Join-Path $root ".env"
+  if (Test-Path $envFile) {
+    Remove-Item -Force $envFile
+    Write-Host "Removed $envFile"
+  }
+}
+
+if (Test-Path $runtimeStateFile) {
+  Remove-Item -Force $runtimeStateFile -ErrorAction SilentlyContinue
+}
+
+Write-Host ""
+Write-Host "Uninstall complete."
+Write-Host "Hint: run start-win11.cmd to start a fresh P2P node."

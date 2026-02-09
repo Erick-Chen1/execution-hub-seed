@@ -1,6 +1,12 @@
+param(
+  [switch]$SkipOpenBrowser
+)
+
 $ErrorActionPreference = "Stop"
 
-$root = Resolve-Path (Join-Path $PSScriptRoot "..")
+$root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$runtimeDir = Join-Path $root "tmp\runtime"
+$runtimeStateFile = Join-Path $runtimeDir "win11-p2p-processes.json"
 Set-Location $root
 
 function Assert-Command {
@@ -16,89 +22,84 @@ function Assert-Command {
   }
 }
 
-Assert-Command "podman" "Install Podman Desktop (podman compose required)."
-Assert-Command "go" "Install Go 1.24+."
-Assert-Command "node" "Install Node 18+ (npm included)."
-Assert-Command "npm" "Install Node 18+ (npm included)."
-
-$envFile = Join-Path $root ".env"
-$envExample = Join-Path $root ".env.example"
-if (-not (Test-Path $envFile) -and (Test-Path $envExample)) {
-  Copy-Item $envExample $envFile
-  Write-Host "Created .env from .env.example"
-}
-
-function Load-DotEnv {
-  param([string]$Path)
-  if (-not (Test-Path $Path)) { return }
-  foreach ($line in Get-Content $Path) {
-    $trimmed = $line.Trim()
-    if (-not $trimmed) { continue }
-    if ($trimmed.StartsWith("#")) { continue }
-    $pair = $trimmed.Split("=", 2)
-    if ($pair.Count -ne 2) { continue }
-    $key = $pair[0].Trim()
-    $value = $pair[1].Trim()
-    if ($key) { Set-Item -Path ("env:{0}" -f $key) -Value $value }
-  }
-}
-
-Load-DotEnv $envFile
-
-$podmanOk = $true
-try { podman info | Out-Null } catch { $podmanOk = $false }
-if (-not $podmanOk) {
-  Write-Host "Podman not running. Starting podman machine..."
-  try { podman machine start | Out-Null } catch {}
-  $podmanOk = $true
-  try { podman info | Out-Null } catch { $podmanOk = $false }
-  if (-not $podmanOk) {
-    Write-Host "Podman machine not initialized. Initializing..."
-    try { podman machine init | Out-Null } catch {}
-    try { podman machine start | Out-Null } catch {}
-    $podmanOk = $true
-    try { podman info | Out-Null } catch { $podmanOk = $false }
-    if (-not $podmanOk) {
-      Write-Host "Podman is still unavailable. Please run: podman machine init"
-      exit 1
+function Stop-TrackedProcess {
+  param([int]$ProcessId)
+  if ($ProcessId -le 0) { return }
+  try {
+    $p = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if ($p) {
+      Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+      Write-Host "Stopped stale tracked process PID $ProcessId"
     }
-  }
+  } catch {}
 }
 
-Write-Host "Starting Postgres container..."
-podman compose -f compose.yaml up -d | Out-Null
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "podman compose failed. Check your Podman setup and compose.yaml."
-  exit 1
+if (-not (Test-Path $runtimeDir)) {
+  New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
 }
 
-$pgUser = if ($env:POSTGRES_USER) { $env:POSTGRES_USER } else { "exec_hub" }
-$pgDb = if ($env:POSTGRES_DB) { $env:POSTGRES_DB } else { "exec_hub" }
+if (Test-Path $runtimeStateFile) {
+  try {
+    $state = Get-Content $runtimeStateFile -Raw | ConvertFrom-Json
+    Stop-TrackedProcess -ProcessId ([int]$state.nodePid)
+  } catch {}
+  Remove-Item $runtimeStateFile -Force -ErrorAction SilentlyContinue
+}
+
+Assert-Command "go" "Install Go 1.24+."
+
+$nodeID = if ($env:P2P_NODE_ID) { $env:P2P_NODE_ID } else { "node-1" }
+$raftAddr = if ($env:P2P_RAFT_ADDR) { $env:P2P_RAFT_ADDR } else { "127.0.0.1:17000" }
+$httpAddr = if ($env:P2P_HTTP_ADDR) { $env:P2P_HTTP_ADDR } else { "127.0.0.1:18080" }
+$dataDir = if ($env:P2P_DATA_DIR) { $env:P2P_DATA_DIR } else { "tmp/p2pnode/$nodeID" }
+$bootstrap = if ($env:P2P_BOOTSTRAP) { $env:P2P_BOOTSTRAP } else { "true" }
+$joinEndpoint = if ($env:P2P_JOIN_ENDPOINT) { $env:P2P_JOIN_ENDPOINT } else { "" }
+
+Write-Host "Starting P2P node..."
+$startCmd = @(
+  "`$env:P2P_NODE_ID='$nodeID'",
+  "`$env:P2P_RAFT_ADDR='$raftAddr'",
+  "`$env:P2P_HTTP_ADDR='$httpAddr'",
+  "`$env:P2P_DATA_DIR='$dataDir'",
+  "`$env:P2P_BOOTSTRAP='$bootstrap'"
+)
+if ($joinEndpoint -ne "") {
+  $startCmd += "`$env:P2P_JOIN_ENDPOINT='$joinEndpoint'"
+}
+$startCmd += "go run ./cmd/p2pnode"
+$nodeArgs = @("-NoExit", "-NoProfile", "-Command", ($startCmd -join "; "))
+$nodeProc = Start-Process -FilePath "powershell" -WorkingDirectory $root -ArgumentList $nodeArgs -PassThru
+
+$stateObj = [pscustomobject]@{
+  nodePid   = $nodeProc.Id
+  nodeId    = $nodeID
+  raftAddr  = $raftAddr
+  httpAddr  = $httpAddr
+  startedAt = (Get-Date).ToString("o")
+}
+$stateObj | ConvertTo-Json | Set-Content -Encoding UTF8 $runtimeStateFile
+
+$healthURL = "http://$httpAddr/healthz"
 $ready = $false
-for ($i = 0; $i -lt 30; $i++) {
-  podman exec execution-hub-postgres pg_isready -U $pgUser -d $pgDb | Out-Null
-  if ($LASTEXITCODE -eq 0) { $ready = $true; break }
-  Start-Sleep -Seconds 1
+for ($i = 0; $i -lt 40; $i++) {
+  try {
+    $null = Invoke-RestMethod -Method Get -Uri $healthURL -TimeoutSec 2
+    $ready = $true
+    break
+  } catch {}
+  Start-Sleep -Milliseconds 500
 }
-if (-not $ready) {
-  Write-Host "Warning: Postgres not ready yet. The API may fail to start immediately."
-}
-
-Write-Host "Starting API server..."
-$serverArgs = @("-NoExit", "-NoProfile", "-Command", "go run ./cmd/server")
-Start-Process -FilePath "powershell" -WorkingDirectory $root -ArgumentList $serverArgs | Out-Null
-
-Write-Host "Starting web UI..."
-$webDir = Join-Path $root "web"
-$webCmd = "if (-not (Test-Path 'node_modules')) { npm install }; npm run dev"
-$webArgs = @("-NoExit", "-NoProfile", "-Command", $webCmd)
-Start-Process -FilePath "powershell" -WorkingDirectory $webDir -ArgumentList $webArgs | Out-Null
-
-Start-Sleep -Seconds 2
-$webUrl = "http://localhost:5173"
-Start-Process $webUrl | Out-Null
 
 Write-Host ""
-Write-Host "Done."
-Write-Host "API: http://127.0.0.1:8080"
-Write-Host "Web: $webUrl"
+if ($ready) {
+  Write-Host "Done."
+} else {
+  Write-Host "Started, but health check is not ready yet."
+}
+Write-Host "P2P API: http://$httpAddr (PID $($nodeProc.Id))"
+Write-Host "Health: $healthURL"
+Write-Host "Runtime state: $runtimeStateFile"
+
+if (-not $SkipOpenBrowser) {
+  Start-Process $healthURL | Out-Null
+}

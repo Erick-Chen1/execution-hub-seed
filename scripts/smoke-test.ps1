@@ -1,129 +1,82 @@
 $ErrorActionPreference = "Stop"
 
-$root = Resolve-Path (Join-Path $PSScriptRoot "..")
+$root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $root
 
-$env:POSTGRES_USER = "exec_hub"
-$env:POSTGRES_PASSWORD = "exec_hub_pass"
-$env:POSTGRES_DB = "exec_hub_smoke"
-$env:POSTGRES_PORT = "55432"
-$env:POSTGRES_HOST = "127.0.0.1"
-$env:DATABASE_SSLMODE = "disable"
-$env:SERVER_ADDR = "127.0.0.1:18080"
-$env:AUDIT_SIGNING_KEY = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
-
-$base = "http://127.0.0.1:18080/v1"
-$proc = $null
-$success = $false
 $logDir = Join-Path $root "tmp\smoke"
-New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-$stdout = Join-Path $logDir "server.out.log"
-$stderr = Join-Path $logDir "server.err.log"
+$stdout = Join-Path $logDir "p2pnode.out.log"
+$stderr = Join-Path $logDir "p2pnode.err.log"
+$nodeBin = Join-Path $root "bin\p2pnode-smoke.exe"
+$node = $null
+$success = $false
+
+function Wait-Health {
+  param([string]$Url, [int]$Retries = 60)
+  for ($i = 0; $i -lt $Retries; $i++) {
+    try {
+      $null = Invoke-RestMethod -Method Get -Uri $Url -TimeoutSec 2
+      return $true
+    } catch {}
+    Start-Sleep -Milliseconds 500
+  }
+  return $false
+}
 
 try {
-  podman compose down -v | Out-Null
-  podman compose up -d | Out-Null
+  New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+  New-Item -ItemType Directory -Force -Path (Join-Path $root "bin") | Out-Null
 
-  $ready = $false
-  for ($i = 0; $i -lt 30; $i++) {
-    podman exec execution-hub-postgres pg_isready -U $env:POSTGRES_USER -d $env:POSTGRES_DB | Out-Null
-    if ($LASTEXITCODE -eq 0) { $ready = $true; break }
-    Start-Sleep -Seconds 1
-  }
-  if (-not $ready) { throw "Postgres not ready" }
+  go build -o $nodeBin .\cmd\p2pnode
 
-  New-Item -ItemType Directory -Force -Path .\bin | Out-Null
-  go build -o .\bin\execution-hub.exe .\cmd\server
+  $env:P2P_NODE_ID = "smoke-node"
+  $env:P2P_RAFT_ADDR = "127.0.0.1:17100"
+  $env:P2P_HTTP_ADDR = "127.0.0.1:18100"
+  $env:P2P_DATA_DIR = (Join-Path $root "tmp\p2pnode\smoke-node")
+  $env:P2P_BOOTSTRAP = "true"
 
+  Remove-Item -Recurse -Force $env:P2P_DATA_DIR -ErrorAction SilentlyContinue
   Remove-Item -Path $stdout, $stderr -ErrorAction SilentlyContinue
-  $proc = Start-Process -FilePath .\bin\execution-hub.exe -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 
-  $serverReady = $false
-  $bootstrap = @{ username = "alice"; password = "S3cure!Passw0rd" }
-  for ($i = 0; $i -lt 30; $i++) {
-    try {
-      Invoke-RestMethod -Method Post -Uri "$base/auth/bootstrap" -Body ($bootstrap | ConvertTo-Json) -ContentType "application/json" | Out-Null
-    } catch {}
-    try {
-      $login = Invoke-RestMethod -Method Post -Uri "$base/auth/login" -Body ($bootstrap | ConvertTo-Json) -ContentType "application/json" -SessionVariable session
-      if ($session) { $serverReady = $true; break }
-    } catch {}
-    Start-Sleep -Seconds 1
+  $node = Start-Process -FilePath $nodeBin -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+
+  $health = "http://127.0.0.1:18100/healthz"
+  if (-not (Wait-Health -Url $health -Retries 80)) {
+    throw "P2P node not ready. Check $stdout and $stderr"
   }
-  if (-not $serverReady) { throw "Server not ready or login failed. Check $stdout and $stderr." }
 
-  $wfReq = @{
-    name = "smoke_workflow"
-    steps = @(
-      @{
-        step_key = "s1"
-        name = "Step1"
-        executor_type = "HUMAN"
-        executor_ref = "user:alice"
-        action_type = "NOTIFY"
-        action_config = @{ title = "Hello"; body = "Step1"; channel = "SSE"; userId = "alice" }
-        timeout_seconds = 0
-        max_retries = 1
-      },
-      @{
-        step_key = "s2"
-        name = "Step2"
-        executor_type = "HUMAN"
-        executor_ref = "user:alice"
-        action_type = "NOTIFY"
-        action_config = @{ title = "Hello2"; body = "Step2"; channel = "SSE"; userId = "alice" }
-        timeout_seconds = 0
-        max_retries = 1
-        depends_on = @("s1")
-      }
-    )
-  }
-  $wf = Invoke-RestMethod -Method Post -Uri "$base/workflows" -Body ($wfReq | ConvertTo-Json -Depth 8) -ContentType "application/json" -WebSession $session
+  $sessionID = "smoke-session"
+  $participantID = "smoke-participant"
 
-  $taskReq = @{ title = "smoke task"; workflow_id = $wf.workflow_id; context = @{ flag = $true } }
-  $task = Invoke-RestMethod -Method Post -Uri "$base/tasks" -Body ($taskReq | ConvertTo-Json -Depth 8) -ContentType "application/json" -WebSession $session
+  $tx1 = go run .\scripts\p2p-txgen.go --op session-create --session-id $sessionID --actor smoke
+  $apply1 = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:18100/v1/p2p/tx" -Body $tx1 -ContentType "application/json"
 
-  Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/start" -WebSession $session | Out-Null
+  $tx2 = go run .\scripts\p2p-txgen.go --op participant-join --session-id $sessionID --participant-id $participantID --actor smoke
+  $apply2 = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:18100/v1/p2p/tx" -Body $tx2 -ContentType "application/json"
 
-  $stepsResp = Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)/steps" -WebSession $session
-  $step1 = $stepsResp.steps | Where-Object { $_.stepKey -eq "s1" } | Select-Object -First 1
-  if (-not $step1) { throw "step1 not found" }
+  $session = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:18100/v1/p2p/sessions/$sessionID"
+  $participants = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:18100/v1/p2p/sessions/$sessionID/participants?limit=20"
+  $openSteps = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:18100/v1/p2p/sessions/$sessionID/steps/open?participant_id=$participantID&limit=20"
+  $stats = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:18100/v1/p2p/stats"
 
-  Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/steps/$($step1.stepId)/resolve" -Body (@{ evidence = @{ ok = $true } } | ConvertTo-Json -Depth 6) -ContentType "application/json" -WebSession $session | Out-Null
-
-  $stepsResp = Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)/steps" -WebSession $session
-  $step2 = $stepsResp.steps | Where-Object { $_.stepKey -eq "s2" } | Select-Object -First 1
-  if (-not $step2) { throw "step2 not found" }
-
-  Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/steps/$($step2.stepId)/resolve" -Body (@{ evidence = @{ ok = $true } } | ConvertTo-Json -Depth 6) -ContentType "application/json" -WebSession $session | Out-Null
-
-  $stepsResp = Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)/steps" -WebSession $session
-  $taskFinal = Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)" -WebSession $session
-  $notifications = Invoke-RestMethod -Method Get -Uri "$base/notifications?limit=10" -WebSession $session
-  $taskEvidence = Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)/evidence" -WebSession $session
-
-  $eventReq = @{ source_type = "sensor"; source_id = "sensor-1"; event_type = "temp"; schema_version = "1"; payload = @{ value = 42 } }
-  $eventResp = Invoke-RestMethod -Method Post -Uri "$base/trust/events" -Body ($eventReq | ConvertTo-Json -Depth 6) -ContentType "application/json" -WebSession $session
-  $eventBundle = Invoke-RestMethod -Method Get -Uri "$base/trust/evidence/EVENT/$($eventResp.event_id)" -WebSession $session
-
-  $taskBundle = Invoke-RestMethod -Method Get -Uri "$base/trust/evidence/TASK/$($task.task_id)" -WebSession $session
-  $audit = Invoke-RestMethod -Method Get -Uri "$base/admin/audit?limit=5" -WebSession $session
-
-  $summary = @{
-    workflow_id = $wf.workflow_id
-    task_id = $task.task_id
-    task_status = $taskFinal.status
-    steps = ($stepsResp.steps | Select-Object stepKey, status)
-    notifications_count = ($notifications.notifications | Measure-Object).Count
-    audit_count = ($audit.logs | Measure-Object).Count
-    event_id = $eventResp.event_id
-    task_bundle_type = $taskBundle.bundleType
+  $summary = [ordered]@{
+    tx1_status = $apply1.status
+    tx2_status = $apply2.status
+    session_id = $session.sessionId
+    session_status = $session.status
+    participants_count = ($participants.participants | Measure-Object).Count
+    open_steps_count = ($openSteps.steps | Measure-Object).Count
+    state_stats = $stats
   }
   $summary | ConvertTo-Json -Depth 6
+
   $success = $true
 }
 finally {
-  if ($proc) { try { Stop-Process -Id $proc.Id -Force } catch {} }
-  try { podman compose down -v | Out-Null } catch {}
-  if ($success) { Remove-Item -Recurse -Force $logDir -ErrorAction SilentlyContinue }
+  if ($node) {
+    try { Stop-Process -Id $node.Id -Force } catch {}
+  }
+  Remove-Item -Recurse -Force (Join-Path $root "tmp\p2pnode\smoke-node") -ErrorAction SilentlyContinue
+  if ($success) {
+    Remove-Item -Recurse -Force $logDir -ErrorAction SilentlyContinue
+  }
 }

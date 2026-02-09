@@ -1,5 +1,8 @@
 ﻿# 文档索引
 
+当前运行形态：P2P Only（`cmd/p2pnode` + `/v1/p2p/*`）。
+说明：与 `cmd/server`、`/v2/collab/*` 相关内容属于历史参考，不作为当前主路径。
+
 1. 背景与上下文: docs/00-context.md
 2. 目标与非目标: docs/01-goals.md
 3. 需求清单: docs/02-requirements.md

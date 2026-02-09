@@ -1,6 +1,6 @@
-﻿# Execution Hub Seed
+﻿# Execution Hub Seed (P2P Only)
 
-Execution Hub 种子工程，包含后端 API 与 Web 前端，用于工作流编排、审批、审计与证据链管理。
+Execution Hub 已切换为纯 P2P 协作运行时，仅保留 `cmd/p2pnode` 与 `/v1/p2p/*` 接口。
 
 请从文档索引开始阅读:
 - `docs/INDEX.md`
@@ -18,10 +18,8 @@ OpenAPI 规范:
 ## 本地运行
 依赖:
 - Go 1.24+
-- Podman（支持 `podman compose`）
-- Node 18+
 
-Win 11 一键启动:
+Win 11 一键启动（单节点 P2P）:
 ```
 start-win11.cmd
 ```
@@ -31,14 +29,9 @@ Win 11 一键停止:
 stop-win11.cmd
 ```
 
-启动 Postgres:
+Win 11 一键卸载（默认会删除 P2P 运行数据与运行时文件）:
 ```
-podman compose -f compose.yaml up -d
-```
-
-启动服务:
-```
-go run ./cmd/server
+uninstall-win11.cmd
 ```
 
 启动 P2P 协作节点（Raft + 状态机）:
@@ -59,33 +52,24 @@ set P2P_JOIN_ENDPOINT=http://127.0.0.1:18080
 go run ./cmd/p2pnode
 ```
 
-启动前端:
+高级脚本选项（PowerShell）:
 ```
-cd web
-npm install
-npm run dev
-```
-
-初始化管理员（首次）:
-```
-curl -X POST http://127.0.0.1:8080/v1/auth/bootstrap \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"Strong!Passw0rd"}'
-```
-
-登录获取会话:
-```
-curl -X POST http://127.0.0.1:8080/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"Strong!Passw0rd"}'
+powershell -File scripts/start-win11.ps1 -SkipOpenBrowser
+powershell -File scripts/uninstall-win11.ps1 -KeepData -KeepEnvFile
 ```
 
 ## 测试
 - 冒烟测试: `powershell -File scripts/smoke-test.ps1`
-- 集成测试（Webhook/SSE）: 设置 `TEST_DATABASE_URL` 后运行 `go test -tags=integration ./internal/integration`
+- P2P 包测试: `go test ./internal/p2p/...`
+
+## 事务构造
+- 使用 `go run ./scripts/p2p-txgen.go --op <op> ...` 生成签名事务 JSON
+- 完整参数与 9 个 op 示例见 `docs/24-p2p-runtime-guide.md`
 
 ## 默认配置
-- 服务地址: `SERVER_ADDR`（默认 `0.0.0.0:8080`）
-- 数据库连接: `DATABASE_URL` 或 `POSTGRES_*` 环境变量（参见 `.env.example`）
-- 会话配置: `SESSION_TTL` / `SESSION_COOKIE_NAME` / `SESSION_COOKIE_SECURE`
-- 审计签名: `AUDIT_SIGNING_KEY`（可选，十六进制密钥）
+- P2P 节点: `P2P_NODE_ID`（默认 `node-1`）
+- Raft 地址: `P2P_RAFT_ADDR`（默认 `127.0.0.1:17000`）
+- HTTP 地址: `P2P_HTTP_ADDR`（默认 `0.0.0.0:18080`）
+- 运行数据目录: `P2P_DATA_DIR`（默认 `tmp/p2pnode/<node-id>`）
+- 是否引导集群: `P2P_BOOTSTRAP`（默认 `false`）
+- 加入入口: `P2P_JOIN_ENDPOINT`（用于非引导节点）

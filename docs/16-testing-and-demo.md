@@ -1,42 +1,43 @@
-﻿# 测试与 Demo 指引
+﻿# 测试与 Demo 指引（P2P Only）
 
-建议测试范围
-- Task 启动 -> Step 依赖推进
-- Step 超时 -> 升级策略触发
-- 人工 ACK -> 下游步骤继续
-- EvidenceBundle 校验
-- 审批策略触发与审批通过后自动执行
-- Trust 事件写入与 EvidenceBundle 验证
+本项目当前验收以 P2P Runtime 为主，不再包含中心化 `cmd/server` 演示链路。
 
-Demo 演示流程
-1. 创建 Workflow
-2. 创建 Task
-3. 启动 Task
-4. 展示 AI 步骤输出
-5. 人工复核 ACK
-6. 展示 Task Evidence 回放
-7. 审批策略与审批流演示（Approvals + 审批配置）
-8. Trust 事件写入与 EvidenceBundle 验证
-9. 执行器/通知/Audit 查询演示
+## 建议测试范围
+- 节点引导与加入（leader + follower）
+- 写事务一致性（`POST /v1/p2p/tx`）
+- 状态查询正确性（sessions / participants / open steps / events / stats）
+- leader 变更后的写入行为（`NOT_LEADER` 返回与重试策略）
 
-验收标准
-- 状态机正确流转
-- Evidence 可校验
-- 审计记录完整
+## Demo 演示流程
+1. 启动 node-1（bootstrap）
+2. 启动 node-2（join）
+3. 提交 `SESSION_CREATE` 事务
+4. 提交 `PARTICIPANT_JOIN` 事务
+5. 查询会话与参与者
+6. 查询 open steps 与事件流
+7. 展示 `raft` 与 `stats`
 
-本地运行提示
-- 启动数据库: `podman compose -f compose.yaml up -d`
-- 启动服务: `go run ./cmd/server`
-- 初始化管理员: `POST /v1/auth/bootstrap` 创建首个 ADMIN 用户
-- 登录获取会话: `POST /v1/auth/login`（Cookie 会话或 Bearer）
-- 启动前端: `cd web && npm install && npm run dev`
-- 前端页面覆盖: Dashboard / Workflows / Tasks / Executors / Actions / Notifications / Approvals / Trust / Audit / Users
+## 验收标准
+- `healthz` 返回正常
+- 写请求在 leader 上 `APPLIED`
+- 状态查询结果与已提交事务一致
+- 多节点下 raft 状态可见且可管理（join/remove）
 
-可重复冒烟测试
-- 运行 `scripts/smoke-test.ps1`（自动启动 Postgres、启动服务、执行 API 冒烟流程并清理环境）
-- 脚本内置 `AUDIT_SIGNING_KEY` 与独立端口，避免影响本地开发
-- 脚本会自动执行 bootstrap + login，后续请求携带会话 Cookie
+## 本地运行提示
+- 启动节点: `go run ./cmd/p2pnode`
+- 一键启动: `start-win11.cmd`
+- 一键停止: `stop-win11.cmd`
+- 一键卸载: `uninstall-win11.cmd`
 
-集成测试（Webhook/SSE）
-- 需先设置 `TEST_DATABASE_URL` 指向独立测试库
-- 运行 `go test -tags=integration ./internal/integration`
+## 可重复冒烟测试
+- 运行 `powershell -File scripts/smoke-test.ps1`
+- 脚本会自动:
+  - 构建并启动 `cmd/p2pnode`
+  - 提交最小事务集（session-create / participant-join）
+  - 校验查询接口
+  - 清理临时数据
+
+## 集成测试说明
+- 默认推荐执行 `go test ./...`
+- P2P 相关重点: `go test ./internal/p2p/...`
+- 旧中心化集成测试（`-tags=integration`）仅作历史兼容参考，不作为当前主验收路径
